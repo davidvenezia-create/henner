@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Word Dojo — Henner's Belt Trials</title>
+<style>
+  :root{
+    --bg: #17140F;
+    --bg-grain: #1D1912;
+    --parchment: #F2E9D8;
+    --ink: #1A1815;
+    --gold: #D4A93E;
+    --muted: #B9AF9C;
+    --danger: #B23A2E;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      repeating-linear-gradient(135deg, var(--bg-grain) 0px, var(--bg-grain) 2px, var(--bg) 2px, var(--bg) 40px),
+      var(--bg);
+    color:var(--parchment);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+  .brand{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom: 22px;
+    border-bottom: 2px solid rgba(212,169,62,0.35);
+    padding-bottom: 14px;
+  }
+  .brand h1{
+    font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin:0;
+    color: var(--parchment);
+  }
+  .brand h1 span{ color: var(--gold); }
+  .brand .sub{ font-size: 13px; color: var(--muted); margin-top:2px; }
+  .timer-pill{
+    font-variant-numeric: tabular-nums;
+    background: rgba(212,169,62,0.12);
+    border:1px solid rgba(212,169,62,0.4);
+    color: var(--gold);
+    padding: 6px 12px; border-radius: 999px; font-size:14px; font-weight:700;
+    display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
+    white-space:nowrap;
+  }
+  .timer-pill:hover{ background: rgba(212,169,62,0.2); }
+
+  /* ---------- Belt map ---------- */
+  .beltmap{ display:flex; flex-direction:column; gap:10px; }
+  .belt-row{
+    display:flex; align-items:center; gap:14px;
+    background: rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor:pointer;
+    transition: transform .12s ease, background .12s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .belt-row:hover:not(.locked){ transform: translateX(4px); background: rgba(255,255,255,0.06); }
+  .belt-row.locked{ opacity:0.4; cursor:not-allowed; }
+  .belt-row.done{ border-color: rgba(212,169,62,0.5); }
+  .swatch{
+    width: 46px; height: 14px; border-radius: 3px; flex-shrink:0;
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.25);
+    position:relative;
+  }
+  .swatch::after{
+    content:''; position:absolute; inset:0;
+    background: repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 2px, transparent 2px 8px);
+  }
+  .belt-info{ flex:1; min-width:0; }
+  .belt-info .name{ font-weight:700; font-size:15.5px; }
+  .belt-info .desc{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .belt-status{ font-size:12px; color:var(--gold); font-weight:700; flex-shrink:0; }
+  .belt-status.locked-text{ color: var(--muted); }
+
+  /* ---------- Round screen ---------- */
+  .progress-strip{ display:flex; gap:5px; margin-bottom:22px; }
+  .progress-dot{
+    flex:1; height:7px; border-radius:4px;
+    background: rgba(255,255,255,0.1);
+    overflow:hidden;
+  }
+  .progress-dot.filled{ background: var(--gold); }
+  .progress-dot.current{ background: rgba(212,169,62,0.4); }
+
+  .mat{
+    background: var(--parchment);
+    color: var(--ink);
+    border-radius: 18px;
+    padding: 56px 20px;
+    text-align:center;
+    position:relative;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+    border: 6px solid rgba(0,0,0,0.08);
+  }
+  .mat .beltbar{
+    position:absolute; top:0; left:0; right:0; height:10px;
+    border-radius: 12px 12px 0 0;
+  }
+  .word{
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    word-break: break-word;
+  }
+  .streak-line{
+    margin-top: 18px; font-size: 14px; color:#6b6455; font-weight:600;
+    min-height: 20px;
+  }
+  .streak-line .flame{ font-size:15px; }
+
+  .buttons{
+    display:flex; gap:12px; margin-top: 26px;
+  }
+  .btn{
+    flex:1; border:none; border-radius: 12px; padding: 18px 10px;
+    font-size: 16px; font-weight:800; cursor:pointer;
+    transition: transform .08s ease, filter .1s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-yes{ background:#3E8B5E; color:white; }
+  .btn-yes:hover{ filter:brightness(1.08); }
+  .btn-no{ background: rgba(178,58,46,0.12); color:var(--danger); border:2px solid rgba(178,58,46,0.4); }
+  .btn-no:hover{ background: rgba(178,58,46,0.2); }
+
+  .meta-row{
+    display:flex; justify-content:space-between; margin-top:16px;
+    font-size:12.5px; color:var(--muted);
+  }
+  .exit-link{
+    background:none; border:none; color:var(--muted); text-decoration:underline;
+    cursor:pointer; font-size:12.5px; padding:0;
+  }
+
+  /* ---------- Belt complete ---------- */
+  .ceremony{
+    text-align:center; padding: 50px 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 18px; border:1px solid rgba(255,255,255,0.08);
+  }
+  .belt-swoosh{
+    width: 220px; height: 26px; margin: 0 auto 26px;
+    border-radius: 6px;
+    position:relative;
+    animation: swoosh .7s ease-out;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .belt-swoosh::after{
+    content:''; position:absolute; inset:0;
+    background: repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 3px, transparent 3px 10px);
+    border-radius:6px;
+  }
+  @keyframes swoosh{
+    0%{ transform: scaleX(0); opacity:0; }
+    60%{ transform: scaleX(1.06); opacity:1; }
+    100%{ transform: scaleX(1); }
+  }
+  .ceremony h2{ font-size:24px; margin: 0 0 6px; }
+  .ceremony .stats{ color: var(--muted); font-size:14px; margin-bottom: 28px; }
+  .ceremony .stats b{ color: var(--gold); }
+
+  /* ---------- Final certificate ---------- */
+  .cert{
+    background: var(--parchment); color:var(--ink);
+    border-radius: 18px; padding: 44px 30px; text-align:center;
+    border: 10px double var(--gold);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  .cert .eyebrow{ font-size:12px; letter-spacing:0.08em; color:#7a6f57; margin-bottom: 10px;}
+  .cert h2{ font-size: 30px; margin: 0 0 4px; }
+  .cert .name{ font-size: 22px; font-weight:800; margin: 14px 0 22px; color:#8a1f1f; }
+  .cert .statline{ font-size:14px; color:#4a4436; margin-bottom:4px; }
+
+  .primary-btn{
+    display:inline-block; margin-top: 22px;
+    background: var(--gold); color: var(--ink);
+    border:none; padding: 14px 26px; border-radius: 10px;
+    font-weight:800; font-size:15px; cursor:pointer;
+  }
+  .primary-btn:hover{ filter:brightness(1.08); }
+  .ghost-btn{
+    display:inline-block; margin-top: 14px; margin-left:10px;
+    background:transparent; color: var(--muted); border:1px solid rgba(255,255,255,0.2);
+    padding: 13px 22px; border-radius:10px; font-weight:700; font-size:14px; cursor:pointer;
+  }
+
+  @media (max-width:480px){
+    .word{ font-size: 46px; }
+    .mat{ padding: 44px 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+// ---------- Word data, pulled from the fluency-strip sheets ----------
+const BELTS = [
+  {
+    key:'white', name:'White Belt', desc:'CVC Words — Set 1', color:'#F2EFEA', dark:true,
+    rows:[
+      ['mop','dig','bed','tag','bug'],
+      ['pup','hat','met','not','rid'],
+      ['jab','top','gut','zip','red'],
+      ['tub','wax','rod','yes','tin'],
+      ['hip','gum','pal','beg','jog'],
+      ['rob','gas','bus','pep','bit'],
+    ]
+  },
+  {
+    key:'yellow', name:'Yellow Belt', desc:'CVC Words — Set 2', color:'#E8C547', dark:true,
+    rows:[
+      ['box','web','pig','mad','cub'],
+      ['get','dug','dot','rat','fin'],
+      ['run','wag','sip','led','nod'],
+      ['mix','nut','zap','jot','net'],
+      ['can','wet','dip','fog','cup'],
+      ['win','fun','men','sad'],
+    ]
+  },
+  {
+    key:'orange', name:'Orange Belt', desc:'CVC Words, sorted by vowel sound', color:'#E08E3E', dark:true,
+    rows:[
+      ['cap','hat','rag','bad','gas'],
+      ['bet','yes','red','set','led'],
+      ['pin','lip','hid','fit','mix','big'],
+      ['top','box','log','got','mop'],
+      ['run','cup','bus','mud','hum'],
+      ['dot','mom','top','fog','lot'],
+    ]
+  },
+  {
+    key:'green', name:'Green Belt', desc:'Initial r-Blends (br, cr, dr, fr, gr, tr)', color:'#4C9A6B', dark:true,
+    rows:[
+      ['brag','bred','brim','brass','brick'],
+      ['crib','crop','cross','crab','crisp'],
+      ['drag','drop','drill','drip','drum'],
+      ['frog','frill','frost','fret'],
+      ['grab','grin','grip','grass','grub'],
+      ['trap','trot','trip','trim','trust'],
+    ]
+  },
+  {
+    key:'blue', name:'Blue Belt', desc:'Initial s-Blends (sc, st, sl, sn, sp, sw)', color:'#3E7CB1', dark:true,
+    rows:[
+      ['scab','skin','skip','skill'],
+      ['still','stuff','step','stop'],
+      ['slid','slop','sled','slot'],
+      ['snap','snug','sniff','snip'],
+      ['spin','spat','spell','smell'],
+      ['swim','swam','swig','swum'],
+    ]
+  },
+  {
+    key:'purple', name:'Purple Belt', desc:'s-Blends at the end of words, round 1', color:'#7C5BA6', dark:true,
+    rows:[
+      ['mask','risk','desk','tusk'],
+      ['cost','best','fast','just'],
+      ['ask','desk','husk','mask'],
+      ['best','fast','lost','just'],
+      ['dusk','bask','disk','task'],
+      ['gasp','wisp','rasp','cusp'],
+    ]
+  },
+  {
+    key:'brown', name:'Brown Belt', desc:'s-Blends and t-Blends, round 2', color:'#7B5B3A', dark:true,
+    rows:[
+      ['risk','desk','whisk','ask'],
+      ['last','cost','past'],
+      ['fist','dust','past','nest'],
+      ['belt','welt','spilt','quilt'],
+      ['cost','best','fast','lost','just'],
+      ['gift','soft','lift','left','raft'],
+    ]
+  },
+  {
+    key:'red', name:'Red Belt', desc:'t-Blends and l-Blends at the end of words', color:'#B23A2E', dark:true,
+    rows:[
+      ['rest','cast','must','last'],
+      ['tilt','melt','wilt','felt'],
+      ['gulf','self','golf'],
+      ['silk','milk','stalk','sulk'],
+      ['gulp','help','scalp','pulp'],
+      ['film','silt','helm','quilt'],
+    ]
+  },
+  {
+    key:'black', name:'Black Belt', desc:'BOSS LEVEL — 3-letter s-Blends (scr, spl, str)', color:'#1F1B15', dark:false,
+    rows:[
+      ['scrap','scrub','scruff','scram'],
+      ['splat','split','sprig','sprint'],
+      ['strip','stress','strict','strum'],
+      ['scrub','split','strut','scruff'],
+      ['strap','splat','scrap','stress'],
+      ['strict','strop','scram','sprig'],
+    ]
+  },
+];
+
+const STUDENT_NAME = "Henner";
+
+// ---------- App state (in-memory only) ----------
+let state = {
+  screen: 'map',       // 'map' | 'round' | 'beltdone' | 'cert'
+  beltIndex: 0,
+  unlockedUpTo: 0,      // index of highest unlocked belt
+  wordQueue: [],         // words remaining this round (array of {w})
+  roundIndex: 0,
+  totalRounds: 0,
+  correctCount: 0,
+  attemptCount: 0,
+  streak: 0,
+  bestStreak: 0,
+  timerSeconds: 0,
+  timerRunning: false,
+  timerHandle: null,
+  totalCorrectAllBelts: 0,
+  totalAttemptsAllBelts: 0,
+};
+
+function fmtTime(s){
+  const m = Math.floor(s/60).toString().padStart(2,'0');
+  const sec = (s%60).toString().padStart(2,'0');
+  return m+':'+sec;
+}
+
+function toggleTimer(){
+  if(state.timerRunning){
+    clearInterval(state.timerHandle);
+    state.timerRunning = false;
+  } else {
+    state.timerHandle = setInterval(()=>{
+      state.timerSeconds++;
+      const el = document.getElementById('timerDisplay');
+      if(el) el.textContent = fmtTime(state.timerSeconds);
+    }, 1000);
+    state.timerRunning = true;
+  }
+  render();
+}
+
+function startBelt(i){
+  if(i > state.unlockedUpTo) return;
+  state.beltIndex = i;
+  state.roundIndex = 0;
+  state.totalRounds = BELTS[i].rows.length;
+  state.correctCount = 0;
+  state.attemptCount = 0;
+  state.streak = 0;
+  loadRound();
+  state.screen = 'round';
+  render();
+}
+
+function loadRound(){
+  const belt = BELTS[state.beltIndex];
+  const words = belt.rows[state.roundIndex];
+  state.wordQueue = words.slice();
+}
+
+function markResult(correct){
+  const belt = BELTS[state.beltIndex];
+  const word = state.wordQueue[0];
+  state.attemptCount++;
+  state.totalAttemptsAllBelts++;
+  if(correct){
+    state.correctCount++;
+    state.totalCorrectAllBelts++;
+    state.streak++;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+    state.wordQueue.shift();
+  } else {
+    state.streak = 0;
+    // send it to the back of the line for another try
+    state.wordQueue.push(state.wordQueue.shift());
+    if(state.wordQueue.length > 1){
+      // avoid immediate repeat by rotating once more if same word is now first
+    }
+  }
+
+  if(state.wordQueue.length === 0){
+    // round finished
+    if(state.roundIndex + 1 < state.totalRounds){
+      state.roundIndex++;
+      loadRound();
+    } else {
+      // belt finished
+      if(state.beltIndex === state.unlockedUpTo && state.unlockedUpTo < BELTS.length - 1){
+        state.unlockedUpTo++;
+      }
+      state.screen = (state.beltIndex === BELTS.length - 1) ? 'cert' : 'beltdone';
+    }
+  }
+  render();
+}
+
+function goMap(){
+  state.screen = 'map';
+  render();
+}
+
+function nextBelt(){
+  const next = Math.min(state.beltIndex + 1, BELTS.length - 1);
+  startBelt(next);
+}
+
+function resetAll(){
+  if(state.timerRunning) toggleTimer();
+  state = {
+    screen:'map', beltIndex:0, unlockedUpTo:0, wordQueue:[], roundIndex:0, totalRounds:0,
+    correctCount:0, attemptCount:0, streak:0, bestStreak:0,
+    timerSeconds:0, timerRunning:false, timerHandle:null,
+    totalCorrectAllBelts:0, totalAttemptsAllBelts:0,
+  };
+  render();
+}
+
+// ---------- Rendering ----------
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = header() + body();
+}
+
+function header(){
+  return `
+    <div class="brand">
+      <div>
+        <h1>${STUDENT_NAME}'s <span>Word Dojo</span></h1>
+        <div class="sub">${state.screen==='round' ? BELTS[state.beltIndex].name+' &middot; Round '+(state.roundIndex+1)+' of '+state.totalRounds : 'Belt trials &middot; read every word out loud'}</div>
+      </div>
+      <div class="timer-pill" onclick="toggleTimer()">
+        ⏱ <span id="timerDisplay">${fmtTime(state.timerSeconds)}</span> ${state.timerRunning ? '⏸' : '▶'}
+      </div>
+    </div>
+  `;
+}
+
+function body(){
+  if(state.screen === 'map') return mapScreen();
+  if(state.screen === 'round') return roundScreen();
+  if(state.screen === 'beltdone') return beltDoneScreen();
+  if(state.screen === 'cert') return certScreen();
+  return '';
+}
+
+function mapScreen(){
+  const rowsHtml = BELTS.map((b, i) => {
+    const locked = i > state.unlockedUpTo;
+    const done = i < state.unlockedUpTo;
+    return `
+      <div class="belt-row ${locked?'locked':''} ${done?'done':''}" onclick="startBelt(${i})">
+        <div class="swatch" style="background:${b.color}"></div>
+        <div class="belt-info">
+          <div class="name">${b.name}</div>
+          <div class="desc">${b.desc}</div>
+        </div>
+        <div class="belt-status ${locked?'locked-text':''}">${locked ? '🔒 Locked' : (done ? '✓ Earned' : 'Start →')}</div>
+      </div>
+    `;
+  }).join('');
+  return `<div class="beltmap">${rowsHtml}</div>`;
+}
+
+function roundScreen(){
+  const belt = BELTS[state.beltIndex];
+  const word = state.wordQueue[0] || '';
+  const dots = [];
+  for(let i=0;i<state.totalRounds;i++){
+    let cls = 'progress-dot';
+    if(i < state.roundIndex) cls += ' filled';
+    else if(i === state.roundIndex) cls += ' current';
+    dots.push(`<div class="${cls}"></div>`);
+  }
+  let streakText = '';
+  if(state.streak >= 3){
+    streakText = `<span class="flame">🔥</span> ${state.streak} in a row!`;
+  } else if(state.streak === 0 && state.attemptCount > 0){
+    streakText = "Circling back to that one — no worries.";
+  } else {
+    streakText = 'Read it out loud, then tap what happened.';
+  }
+  return `
+    <div class="progress-strip">${dots.join('')}</div>
+    <div class="mat">
+      <div class="beltbar" style="background:${belt.color}"></div>
+      <div class="word">${word}</div>
+      <div class="streak-line">${streakText}</div>
+    </div>
+    <div class="buttons">
+      <button class="btn btn-yes" onclick="markResult(true)">✅ Nailed it</button>
+      <button class="btn btn-no" onclick="markResult(false)">↻ Try again</button>
+    </div>
+    <div class="meta-row">
+      <span>${state.correctCount} correct &middot; ${state.attemptCount} read so far</span>
+      <button class="exit-link" onclick="goMap()">Back to dojo map</button>
+    </div>
+  `;
+}
+
+function beltDoneScreen(){
+  const belt = BELTS[state.beltIndex];
+  const acc = state.attemptCount ? Math.round(100*state.correctCount/state.attemptCount) : 100;
+  const next = BELTS[state.beltIndex+1];
+  return `
+    <div class="ceremony">
+      <div class="belt-swoosh" style="background:${belt.color}"></div>
+      <h2>${belt.name} earned! 🥋</h2>
+      <div class="stats">${belt.desc} &middot; every word read &middot; best streak <b>${state.bestStreak}</b></div>
+      <button class="primary-btn" onclick="nextBelt()">Start ${next.name} →</button><br>
+      <button class="ghost-btn" onclick="goMap()">Back to dojo map</button>
+    </div>
+  `;
+}
+
+function certScreen(){
+  const acc = state.totalAttemptsAllBelts ? Math.round(100*state.totalCorrectAllBelts/state.totalAttemptsAllBelts) : 100;
+  return `
+    <div class="ceremony">
+      <div class="belt-swoosh" style="background:#1F1B15"></div>
+      <div class="cert">
+        <div class="eyebrow">CERTIFICATE OF MASTERY</div>
+        <h2>Black Belt in Word Reading</h2>
+        <div class="name">${STUDENT_NAME}</div>
+        <div class="statline">Total time on the mat: <b>${fmtTime(state.timerSeconds)}</b></div>
+        <div class="statline">Best streak: <b>${state.bestStreak}</b> words in a row</div>
+        <div class="statline">All ${BELTS.length} belts earned</div>
+        <button class="primary-btn" onclick="resetAll()">Run it back from White Belt</button>
+      </div>
+    </div>
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
